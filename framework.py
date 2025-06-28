@@ -2,10 +2,6 @@ import socket
 import default_response as dr
 import os
 
-HOST = "127.0.0.1"
-PORT = 8080
-MAX_REQUEST_LINE_LENGTH = 5
-
 file_content_types = {
 	"html" : "text/html",
 	"txt" : "text",
@@ -14,7 +10,17 @@ file_content_types = {
 	"css" : "text/css"
 }
 
+serve_funcs = {}
 
+def route(path : str, allowed_methods: list):
+	global serve_funcs
+	def decorator(func):
+		for method in allowed_methods:
+			key = f"{path}:{method.upper()}"
+			serve_funcs[key] = func
+		return func
+	return decorator
+	
 
 class Request():
 	method: str
@@ -87,26 +93,30 @@ def serve_POST(sock: socket.socket, request: Request):
 def handle_request(client_sock: socket.socket):
 	request = Request.from_socket(client_sock)
 	if not request: return False
-	# Only GET, and POST are implemented
-	if request.method == "GET":
-		serve_GET(client_sock, request)
-		return True
-	elif request.method == "POST":
-		serve_POST(client_sock, request)
-	else:
-		client_sock.sendall(dr.ERRNO405)
+	# Validate Path
+	if "/../" in request.path:
+		client_sock.sendall(dr.ERRNO400)
+	global serve_funcs
+	key = request.path + ":" + request.method.upper()
+	func = serve_funcs.get(key, None)
+
+	print(key)
+
+	if func == None:
+		client_sock.sendall(dr.ERRNO404)
 		return False
+	client_sock.sendall(func(request))
 		
 
-def serve_forever():
+def serve_forever(host = '127.0.0.1', port = 8080, max_request_line_length = 5):
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	# Allow the server to run on an address alreayd used by another socket
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 	# Bind the server to a port
-	server.bind((HOST, PORT))
+	server.bind((host, port))
 	# Now start the server
-	server.listen(MAX_REQUEST_LINE_LENGTH)
-	print(f"listening on {HOST}:{PORT}...")
+	server.listen(max_request_line_length)
+	print(f"listening on {host}:{port}...")
 
 	# Listening for connections
 	while True:
