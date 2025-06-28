@@ -56,39 +56,18 @@ class Request():
 			client_sock.sendall(dr.ERRNO400)
 			return False
 			
-def serve_GET(sock: socket.socket, request: Request):
-	if request.method != "GET":
-		raise TypeError(f"serve_GET only works for GET not {request.method}")
-	path = request.path
-	if path == "/": path = "/index.html"
-	# Throw an error, if the path could be malicious
-	if ".." in path: 
-		sock.sendall(dr.ERRNO400)
-		return False
-	
-	# Make all the files they can access need to be in the 'htdocs' folder
-	path = "htdocs" + path
-	# If the path they specify does not have a file type in it, add html to the end
-	if "." not in path: path += ".html"
-	print(f"GET Request for {path}")
+def serve_file(file_path, **kwargs):
 	try:
-		with open(path, "rb") as file:
-			stat = os.stat(path)
-			headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[path.split('.')[-1]], 
-											 content_length=stat.st_size).encode('utf-8')
+		with open(file_path, "rb") as file:
 			content = file.read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
-			sock.sendall(headers + content + b"\r\n")
+			headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[file_path.split('.')[-1]], 
+											 content_length=len(content)).encode('utf-8')
+			return (headers + content + b"\r\n")
 	except (FileNotFoundError, IsADirectoryError) as e:
-		sock.sendall(dr.ERRNO404)
+		return dr.ERRNO404
 	except PermissionError:
-		sock.sendall(dr.ERRNO403)
+		return dr.ERRNO403
 
-def serve_POST(sock: socket.socket, request: Request):
-	if request.method != "POST":
-		raise TypeError(f"serve_POST only works for POST not {request.method}")
-	[print(f'{k} = {v}') for k, v in request.body.items()]
-	header = dr.FILE_TEMPLATE.format(content_type="text", content_length=sum(map(len, request.body.keys())) + 2 * len(request.body.keys()))
-	sock.sendall(header.encode('utf-8') + "\r\n".join(request.body).encode('utf-8') + b"\r\n")
 
 def handle_request(client_sock: socket.socket):
 	request = Request.from_socket(client_sock)
@@ -103,7 +82,7 @@ def handle_request(client_sock: socket.socket):
 	print(key)
 
 	if func == None:
-		client_sock.sendall(dr.ERRNO404)
+		client_sock.sendall(serve_file('htdocs' + request.path))
 		return False
 	client_sock.sendall(func(request))
 		

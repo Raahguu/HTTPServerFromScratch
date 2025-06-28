@@ -3,10 +3,12 @@ body {
   max-width: 500px;
   margin: 2rem auto;
 }
+
 form {
   display: flex;
   flex-direction: column;
 }
+
 input, textarea, button {
   margin-top: 0.5rem;
   padding: 0.5rem;
