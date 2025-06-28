@@ -6,11 +6,22 @@ HOST = "127.0.0.1"
 PORT = 8080
 MAX_REQUEST_LINE_LENGTH = 5
 
+file_content_types = {
+	"html" : "text/html",
+	"txt" : "text",
+	"xml" : "text/xml",
+	"js" : "text/js",
+	"css" : "text/css"
+}
+
+
+
 class Request():
 	method: str
 	path: str
 	version: str
 	headers: list[str]
+	body: dict
 
 	@classmethod
 	def from_socket(cls, client_sock: socket.socket) -> 'Request':
@@ -22,15 +33,26 @@ class Request():
 			request.method = first_line[0]
 			request.path = first_line[1]
 			request.version = first_line[2]
-			request.headers = data[1:]
+			
+			# get when the headers becomes the body
+			request.body = {}
+			change_index = data.index('') if '' in data and len(data) >= 1 else -1
+			if change_index == -1: request.headers = data[1:]
+			else: 
+				request.headers = data[1:change_index]
+				for d in data[change_index + 1:]:
+					for i in d.split('&'):
+						j = i.split('=', 1)
+						request.body[j[0]] = j[1].replace('+', ' ')
 			return request
 		except Exception as e:
 			print(f"Failed to parse request: {e}")
 			client_sock.sendall(dr.ERRNO400)
+			return False
 			
 def serve_GET(sock: socket.socket, request: Request):
-	if request.method != "GET": 
-		raise TypeError(f"serve_GET only handles GET requests, not {request.method} requests")
+	if request.method != "GET":
+		raise TypeError(f"serve_GET only works for GET not {request.method}")
 	path = request.path
 	if path == "/": path = "/index.html"
 	# Throw an error, if the path could be malicious
@@ -38,31 +60,42 @@ def serve_GET(sock: socket.socket, request: Request):
 		sock.sendall(dr.ERRNO400)
 		return False
 	
-	# Make all the files they can access need to be in the 'content' folder
-	path = "content" + path
+	# Make all the files they can access need to be in the 'htdocs' folder
+	path = "htdocs" + path
 	# If the path they specify does not have a file type in it, add html to the end
 	if "." not in path: path += ".html"
+	print(f"GET Request for {path}")
 	try:
 		with open(path, "rb") as file:
 			stat = os.stat(path)
-			headers = dr.FILE_TEMPLATE.format(content_type="text/html", 
+			headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[path.split('.')[-1]], 
 											 content_length=stat.st_size).encode('utf-8')
-			sock.sendall(headers)
-			sock.sendfile(file)
+			content = file.read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+			sock.sendall(headers + content + b"\r\n")
 	except (FileNotFoundError, IsADirectoryError) as e:
-		print(e)
 		sock.sendall(dr.ERRNO404)
 	except PermissionError:
 		sock.sendall(dr.ERRNO403)
 
+def serve_POST(sock: socket.socket, request: Request):
+	if request.method != "POST":
+		raise TypeError(f"serve_POST only works for POST not {request.method}")
+	[print(f'{k} = {v}') for k, v in request.body.items()]
+	header = dr.FILE_TEMPLATE.format(content_type="text", content_length=sum(map(len, request.body.keys())) + 2 * len(request.body.keys()))
+	sock.sendall(header.encode('utf-8') + "\r\n".join(request.body).encode('utf-8') + b"\r\n")
 
 def handle_request(client_sock: socket.socket):
 	request = Request.from_socket(client_sock)
-	# Only GET is implemented yet
-	if request.method != "GET":
+	if not request: return False
+	# Only GET, and POST are implemented
+	if request.method == "GET":
+		serve_GET(client_sock, request)
+		return True
+	elif request.method == "POST":
+		serve_POST(client_sock, request)
+	else:
 		client_sock.sendall(dr.ERRNO405)
 		return False
-	serve_GET(client_sock, request)
 		
 
 def serve_forever():
