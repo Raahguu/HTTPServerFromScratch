@@ -72,20 +72,37 @@ def serve_file(file_path, **kwargs):
 def handle_request(client_sock: socket.socket):
 	request = Request.from_socket(client_sock)
 	if not request: return False
+
 	# Validate Path
 	if "/../" in request.path:
 		client_sock.sendall(dr.ERRNO400)
+
 	global serve_funcs
 	key = request.path + ":" + request.method.upper()
+	print(key)
 	func = serve_funcs.get(key, None)
 
-	print(key)
+	# If custom mapping
+	if func != None:
+		client_sock.sendall(func(request))
+		return True
 
-	if func == None:
+	# If the request was a HEAD, and that wasn't handled seperatly
+	if request.method.upper() == "HEAD":
+		func = serve_funcs.get(request.path + ":" + "GET", None)
+		if func != None:
+			client_sock.sendall(func(request))
+			return True
+	
+	# If not specified method just do path traversal
+	if request.method.upper() == "GET":
 		client_sock.sendall(serve_file('htdocs' + request.path))
-		return False
-	client_sock.sendall(func(request))
-		
+		return True
+	
+	# Else throw a 405 Error
+	client_sock.sendall(dr.ERRNO405)
+	return False
+
 
 def serve_forever(host = '127.0.0.1', port = 8080, max_request_line_length = 5):
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
