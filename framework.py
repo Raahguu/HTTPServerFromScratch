@@ -91,7 +91,10 @@ def handle_request(client_sock: socket.socket):
 	if request.method.upper() == "HEAD":
 		func = serve_funcs.get(request.path + ":" + "GET", None)
 		if func != None:
-			client_sock.sendall(func(request))
+			get_response = func(request).splitlines()
+			empty_line_index = get_response.index(b'')
+			head_response = b"\r\n".join(get_response[:empty_line_index])
+			client_sock.sendall(head_response + b"\r\n")
 			return True
 	
 	# If not specified method just do path traversal
