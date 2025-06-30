@@ -94,17 +94,17 @@ def handle_request(client_sock: socket.socket, default_file_path : str):
 				get_response = func(request).splitlines()
 				empty_line_index = get_response.index(b'')
 				head_response = b"\r\n".join(get_response[:empty_line_index])
-				client_sock.sendall(head_response + b"\r\n")
+				client_sock.sendall(head_response)
 				return True
 		
 		case "GET":
-			client_sock.sendall(serve_file(defaukt_file_path + request.path))
+			client_sock.sendall(serve_file(default_file_path + request.path))
 			return True
 		
 		case "OPTIONS":
 			available_methods = ["OPTIONS"]
 			if (serve_funcs.get(request.path + ":" + "GET", None) != None
-					or ): 
+				or os.path.exists(default_file_path + request.path)): 
 				available_methods += ["GET", "HEAD"]
 			for method in ["POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT"]:
 				if serve_funcs.get(request.path + ":" + method, None) != None:
