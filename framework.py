@@ -69,7 +69,7 @@ def serve_file(file_path, **kwargs):
 		return dr.ERRNO403
 
 
-def handle_request(client_sock: socket.socket):
+def handle_request(client_sock: socket.socket, default_file_path : str):
 	request = Request.from_socket(client_sock)
 	if not request: return False
 
@@ -98,12 +98,13 @@ def handle_request(client_sock: socket.socket):
 				return True
 		
 		case "GET":
-			client_sock.sendall(serve_file('htdocs' + request.path))
+			client_sock.sendall(serve_file(defaukt_file_path + request.path))
 			return True
 		
 		case "OPTIONS":
 			available_methods = ["OPTIONS"]
-			if serve_funcs.get(request.path + ":" + "GET", None) != None: 
+			if (serve_funcs.get(request.path + ":" + "GET", None) != None
+					or ): 
 				available_methods += ["GET", "HEAD"]
 			for method in ["POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT"]:
 				if serve_funcs.get(request.path + ":" + method, None) != None:
@@ -117,7 +118,8 @@ def handle_request(client_sock: socket.socket):
 	return False
 
 
-def serve_forever(host = '127.0.0.1', port = 8080, max_request_line_length = 5):
+def serve_forever(host : str = '127.0.0.1', port : int= 8080, 
+				  max_request_line_length : int = 5, default_file_path : str = 'htdocs'):
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	# Allow the server to run on an address alreayd used by another socket
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -130,7 +132,7 @@ def serve_forever(host = '127.0.0.1', port = 8080, max_request_line_length = 5):
 	# Listening for connections
 	while True:
 		client_sock, client_addr = server.accept()
-		handle_request(client_sock)
+		handle_request(client_sock, default_file_path)
 		client_sock.close() # Need to close so their browser page loads
 	
 if __name__ == "__main__":
