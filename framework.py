@@ -87,21 +87,31 @@ def handle_request(client_sock: socket.socket):
 		client_sock.sendall(func(request))
 		return True
 
-	# If the request was a HEAD, and that wasn't handled seperatly
-	if request.method.upper() == "HEAD":
-		func = serve_funcs.get(request.path + ":" + "GET", None)
-		if func != None:
-			get_response = func(request).splitlines()
-			empty_line_index = get_response.index(b'')
-			head_response = b"\r\n".join(get_response[:empty_line_index])
-			client_sock.sendall(head_response + b"\r\n")
+	match request.method.upper():
+		case "HEAD":
+			func = serve_funcs.get(request.path + ":" + "GET", None)
+			if func != None:
+				get_response = func(request).splitlines()
+				empty_line_index = get_response.index(b'')
+				head_response = b"\r\n".join(get_response[:empty_line_index])
+				client_sock.sendall(head_response + b"\r\n")
+				return True
+		
+		case "GET":
+			client_sock.sendall(serve_file('htdocs' + request.path))
 			return True
-	
-	# If not specified method just do path traversal
-	if request.method.upper() == "GET":
-		client_sock.sendall(serve_file('htdocs' + request.path))
-		return True
-	
+		
+		case "OPTIONS":
+			available_methods = ["OPTIONS"]
+			if serve_funcs.get(request.path + ":" + "GET", None) != None: 
+				available_methods += ["GET", "HEAD"]
+			for method in ["POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT"]:
+				if serve_funcs.get(request.path + ":" + method, None) != None:
+					available_methods.append(method)
+			response = dr.ERRNO204.format(allowed_methods=", ".join(available_methods))
+			client_sock.sendall(response.encode('utf-8'))
+			return True
+
 	# Else throw a 405 Error
 	client_sock.sendall(dr.ERRNO405)
 	return False

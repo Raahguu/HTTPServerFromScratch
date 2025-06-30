@@ -1,3 +1,8 @@
+ERRNO204 = """\
+HTTP/1.1 204 No Content
+Allow: {allowed_methods}
+""".replace("\n", "\r\n")
+
 ERRNO400 = b"""\
 HTTP/1.1 400 Bad Request
 Content-type: test/plain
