@@ -28,6 +28,7 @@ class Request():
 	version: str
 	headers: list[str]
 	body: dict
+	cookies: dict
 
 	@classmethod
 	def from_socket(cls, client_sock: socket.socket) -> 'Request':
@@ -50,6 +51,17 @@ class Request():
 					for i in d.split('&'):
 						j = i.split('=', 1)
 						request.body[j[0]] = j[1].replace('+', ' ')
+
+			# Extract Cookies from header
+			request.cookies = {}
+			for i, header in enumerate(request.headers):
+				if header.startswith("Cookie:"):
+					for cookie in header[7:].split(";"):
+						name = cookie.split("=", 1)[0].strip()
+						value = cookie.split("=", 1)[1].strip()
+						request.cookies[name] = value
+					del request.headers[i]
+					print(request.headers)
 			return request
 		except Exception as e:
 			print(f"Failed to parse request: {e}")
