@@ -61,7 +61,6 @@ class Request():
 						value = cookie.split("=", 1)[1].strip()
 						request.cookies[name] = value
 					del request.headers[i]
-					print(request.headers)
 			return request
 		except Exception as e:
 			print(f"Failed to parse request: {e}")

@@ -1,6 +1,7 @@
 ERRNO204 = """\
 HTTP/1.1 204 No Content
 Allow: {allowed_methods}
+Access-Control-Allow_Methods: {allowed_methods}
 """.replace("\n", "\r\n")
 
 ERRNO400 = b"""\
