@@ -71,7 +71,7 @@ class Request():
 			return False
 
 			
-def serve_file(file_path : str, **data):
+def render_file(file_path : str, **data):
 	try:
 		global env
 		template = env.get_template(file_path)
@@ -79,6 +79,19 @@ def serve_file(file_path : str, **data):
 		headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[file_path.split('.')[-1]], 
 										 content_length=len(content)).encode('utf-8')
 		return (headers + content + b"\r\n")
+	except (FileNotFoundError, IsADirectoryError) as e:
+		return dr.ERRNO404
+	except PermissionError:
+		return dr.ERRNO403
+
+
+def serve_file(file_path : str):
+	try:
+		with open(file_path, "rb") as file:
+			content = file.read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+			headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[file_path.split('.')[-1]], 
+											 content_length=len(content)).encode('utf-8')
+			return (headers + content + b"\r\n")
 	except (FileNotFoundError, IsADirectoryError) as e:
 		return dr.ERRNO404
 	except PermissionError:
@@ -114,7 +127,8 @@ def handle_request(client_sock: socket.socket):
 				return True
 		
 		case "GET":
-			client_sock.sendall(serve_file(request.path))
+			global env
+			client_sock.sendall(serve_file(env.loader.searchpath[0] + request.path))
 			return True
 		
 		case "OPTIONS":
