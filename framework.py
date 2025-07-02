@@ -14,6 +14,7 @@ file_content_types = {
 serve_funcs = {}
 
 env = None
+default_header_env = None
 
 def route(path : str, allowed_methods: list):
 	global serve_funcs
@@ -70,27 +71,41 @@ class Request():
 			client_sock.sendall(dr.ERRNO400)
 			return False
 
+def render_header(file_path : str, **data):
+	try:
+		global default_header_env
+		template = default_header_env.get_template(file_path)
+		header = template.render(data).encode('utf-8')
+		return header
+	except Exception as e:
+		print(f"Render Header Error: {str(e)}")
 			
+
 def render_file(file_path : str, **data):
+	cookies = data.get("cookies", None)
 	try:
 		global env
 		template = env.get_template(file_path)
 		content = template.render(data).encode('utf-8')
-		headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[file_path.split('.')[-1]], 
-										 content_length=len(content)).encode('utf-8')
+		headers = render_header('default_header',
+			content_type=file_content_types[file_path.split('.')[-1]],
+			content_length=len(content),
+			cookies=cookies)
 		return (headers + content + b"\r\n")
-	except (FileNotFoundError, IsADirectoryError) as e:
+	except (FileNotFoundError, IsADirectoryError):
 		return dr.ERRNO404
 	except PermissionError:
 		return dr.ERRNO403
 
 
-def serve_file(file_path : str):
+def serve_file(file_path : str, cookies : dict = None):
 	try:
 		with open(file_path, "rb") as file:
 			content = file.read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
-			headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[file_path.split('.')[-1]], 
-											 content_length=len(content)).encode('utf-8')
+			headers = render_header('default_header',
+				content_type=file_content_types[file_path.split('.')[-1]],
+				content_length=len(content),
+				cookies=cookies)
 			return (headers + content + b"\r\n")
 	except (FileNotFoundError, IsADirectoryError) as e:
 		return dr.ERRNO404
@@ -100,6 +115,7 @@ def serve_file(file_path : str):
 
 def handle_request(client_sock: socket.socket):
 	request = Request.from_socket(client_sock)
+
 	if not request: return False
 
 	# Validate Path
@@ -149,7 +165,8 @@ def handle_request(client_sock: socket.socket):
 
 
 def serve_forever(host : str = '127.0.0.1', port : int= 8080, 
-				  max_request_line_length : int = 5, default_file_path : str = 'htdocs'):
+				  max_request_line_length : int = 5, default_file_path : str = 'htdocs',
+				  default_header_path : str = 'headers'):
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	# Allow the server to run on an address alreayd used by another socket
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -161,6 +178,9 @@ def serve_forever(host : str = '127.0.0.1', port : int= 8080,
 
 	global env
 	env = Environment(loader=FileSystemLoader(default_file_path))
+
+	global default_header_env
+	default_header_env = Environment(loader=FileSystemLoader(default_header_path))
 
 	# Listening for connections
 	while True:

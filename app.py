@@ -4,7 +4,7 @@ import os
 
 @framework.route("/", ["GET"])
 def index(request : framework.Request):
-	return framework.render_file('index.html', message=["1", 2, 3, 4, 5])
+	return framework.render_file('index.html', message=["1", 2, 3, 4, 5], cookies={"uid": 4, "noid": 2})
 
 @framework.route("/", ["POST"])
 def index_post(request : framework.Request):
