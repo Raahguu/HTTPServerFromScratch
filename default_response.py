@@ -37,15 +37,10 @@ Error 405 Method Not Allowed
 """.replace(b"\n", b"\r\n")
 
 
-HELLO_WORLD = b"""\
-HTTP/1.1 200 OK
-
-Hello, World!
-""".replace(b"\n", b"\r\n")
-
 FILE_TEMPLATE = """\
 HTTP/1.1 200 OK
 Content-type: {content_type}
 Content-length: {content_length}
 
 """.replace("\n", "\r\n")
+

@@ -1,6 +1,7 @@
 import socket
 import default_response as dr
 import os
+from jinja2 import Environment, FileSystemLoader
 
 file_content_types = {
 	"html" : "text/html",
@@ -11,6 +12,8 @@ file_content_types = {
 }
 
 serve_funcs = {}
+
+env = None
 
 def route(path : str, allowed_methods: list):
 	global serve_funcs
@@ -66,21 +69,23 @@ class Request():
 			print(f"Failed to parse request: {e}")
 			client_sock.sendall(dr.ERRNO400)
 			return False
+
 			
-def serve_file(file_path, **kwargs):
+def serve_file(file_path : str, **data):
 	try:
-		with open(file_path, "rb") as file:
-			content = file.read().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
-			headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[file_path.split('.')[-1]], 
-											 content_length=len(content)).encode('utf-8')
-			return (headers + content + b"\r\n")
+		global env
+		template = env.get_template(file_path)
+		content = template.render(data).encode('utf-8')
+		headers = dr.FILE_TEMPLATE.format(content_type=file_content_types[file_path.split('.')[-1]], 
+										 content_length=len(content)).encode('utf-8')
+		return (headers + content + b"\r\n")
 	except (FileNotFoundError, IsADirectoryError) as e:
 		return dr.ERRNO404
 	except PermissionError:
 		return dr.ERRNO403
 
 
-def handle_request(client_sock: socket.socket, default_file_path : str):
+def handle_request(client_sock: socket.socket):
 	request = Request.from_socket(client_sock)
 	if not request: return False
 
@@ -109,7 +114,7 @@ def handle_request(client_sock: socket.socket, default_file_path : str):
 				return True
 		
 		case "GET":
-			client_sock.sendall(serve_file(default_file_path + request.path))
+			client_sock.sendall(serve_file(request.path))
 			return True
 		
 		case "OPTIONS":
@@ -140,11 +145,15 @@ def serve_forever(host : str = '127.0.0.1', port : int= 8080,
 	server.listen(max_request_line_length)
 	print(f"listening on {host}:{port}...")
 
+	global env
+	env = Environment(loader=FileSystemLoader(default_file_path))
+
 	# Listening for connections
 	while True:
 		client_sock, client_addr = server.accept()
-		handle_request(client_sock, default_file_path)
+		handle_request(client_sock)
 		client_sock.close() # Need to close so their browser page loads
 	
+
 if __name__ == "__main__":
 	serve_forever()
